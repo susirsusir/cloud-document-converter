@@ -1,7 +1,5 @@
 import i18next from 'i18next'
 import { Docx, docx, Toast } from '@dolphin/lark'
-import { generatePublicUrl, makePublicUrlEffective } from '@dolphin/lark/image'
-import { isDefined } from '@dolphin/common'
 import { CommonTranslationKey, en, Namespace, zh } from '../common/i18n'
 import { confirm } from '../common/notification'
 import { reportBug } from '../common/issue'
@@ -17,7 +15,6 @@ import {
 } from '../common/settings'
 
 const enum TranslationKey {
-  FAILED_TO_LOAD_IMAGES = 'failed_to_load_images',
   UNKNOWN_ERROR = 'unknown_error',
   CONTENT_LOADING = 'content_loading',
   NOT_SUPPORT = 'not_support',
@@ -31,7 +28,6 @@ i18next
     resources: {
       en: {
         translation: {
-          [TranslationKey.FAILED_TO_LOAD_IMAGES]: 'Failed to Load images',
           [TranslationKey.UNKNOWN_ERROR]: 'Unknown error during download',
           [TranslationKey.CONTENT_LOADING]:
             'Part of the content is still loading and cannot be copied at the moment. Please wait for loading to complete and retry',
@@ -46,7 +42,6 @@ i18next
       },
       zh: {
         translation: {
-          [TranslationKey.FAILED_TO_LOAD_IMAGES]: '加载图片失败',
           [TranslationKey.UNKNOWN_ERROR]: '下载过程中出现未知错误',
           [TranslationKey.CONTENT_LOADING]:
             '部分内容仍在加载中，暂时无法复制。请等待加载完成后重试',
@@ -99,19 +94,15 @@ const main = async () => {
 
   await transformMentionUsers(mentionUsers)
 
-  const tokens = images
-    .map(image => {
-      if (!image.data?.token) return null
-
-      const { token } = image.data
-      const publicUrl = generatePublicUrl(token)
-      const code = new URL(publicUrl).searchParams.get('code')
-      if (!code) return null
-
-      image.url = publicUrl
-      return [token, code]
-    })
-    .filter(isDefined)
+  await Promise.all(
+    images.map(async image => {
+      if (!image.data?.fetchSources) return
+      const sources = await image.data.fetchSources()
+      if (sources) {
+        image.url = sources.src
+      }
+    }),
+  )
 
   transformTableWithParents(tableWithParents, {
     transformGridToHtml: settings[SettingKey.Grid] === Grid.ToHTML,
@@ -175,16 +166,6 @@ const main = async () => {
 
   writeViewContent()
 
-  if (tokens.length > 0) {
-    const isSuccess = await makePublicUrlEffective(
-      Object.fromEntries(tokens) as Record<string, string>,
-    )
-    if (!isSuccess) {
-      Toast.error({
-        content: i18next.t(TranslationKey.FAILED_TO_LOAD_IMAGES),
-      })
-    }
-  }
 }
 
 main().catch((error: unknown) => {
