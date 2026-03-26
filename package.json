@@ -44,14 +44,6 @@
     "vitest": "catalog:test",
     "web-ext": "catalog:tools"
   },
-  "lint-staged": {
-    "*.{js,jsx,ts,tsx}": [
-      "eslint"
-    ],
-    "*.{js,jsx,ts,tsx,json,md,css}": [
-      "prettier --check --ignore-path .gitignore --ignore-path .prettierignore"
-    ]
-  },
   "packageManager": "pnpm@10.15.0",
   "volta": {
     "node": "22.18.0",
