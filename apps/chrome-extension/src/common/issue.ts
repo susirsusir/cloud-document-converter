@@ -33,7 +33,7 @@ function generateIssueUrl(issue: Issue): string {
   const { title, body, labels = [], template } = issue
 
   const baseUrl =
-    'https://github.com/whale4113/cloud-document-converter/issues/new'
+    'https://github.com/susirsusir/cloud-document-converter/issues/new'
   const params = new URLSearchParams({
     title: title,
     body: body,
