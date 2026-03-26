@@ -1126,6 +1126,62 @@ export class Transformer {
       : { type: 'paragraph', children: [image] }
   }
 
+  private flattenBlockToPhrasingContent(
+    node: mdast.Nodes,
+  ): mdast.PhrasingContent[] {
+    const result: mdast.PhrasingContent[] = []
+
+    switch (node.type) {
+      case 'list': {
+        node.children.forEach((item, index) => {
+          if (index > 0) result.push({ type: 'text', value: '; ' })
+          const prefix = node.ordered ? `${index + 1}. ` : '• '
+          result.push({ type: 'text', value: prefix })
+          item.children.forEach(child => {
+            if (child.type === 'paragraph') {
+              result.push(...child.children)
+            } else {
+              result.push(...this.flattenBlockToPhrasingContent(child))
+            }
+          })
+        })
+        break
+      }
+      case 'code': {
+        result.push({ type: 'inlineCode', value: node.value })
+        break
+      }
+      case 'blockquote': {
+        result.push({ type: 'text', value: '> ' })
+        node.children.forEach(child => {
+          result.push(...this.flattenBlockToPhrasingContent(child))
+        })
+        break
+      }
+      case 'heading': {
+        result.push({ type: 'strong', children: node.children })
+        break
+      }
+      case 'paragraph': {
+        result.push(...node.children)
+        break
+      }
+      case 'thematicBreak': {
+        result.push({ type: 'text', value: '---' })
+        break
+      }
+      default: {
+        if ('children' in node && Array.isArray(node.children)) {
+          node.children.forEach(child => {
+            result.push(...this.flattenBlockToPhrasingContent(child))
+          })
+        }
+      }
+    }
+
+    return result
+  }
+
   private transformParentBlock<T extends Blocks>(
     block: T,
     evaluateNode: (block: T) => Mutate<T>,
@@ -1502,10 +1558,13 @@ export class Transformer {
               const node = mergedNodes[i]
               const nextNode = mergedNodes.at(i + 1)
 
-              if (node.type === 'paragraph') {
-                normalizedNodes.push(...node.children)
+              if (isPhrasingContent(node)) {
+                normalizedNodes.push(node)
               } else {
-                normalizedNodes.push(node as mdast.PhrasingContent)
+                // 将块级内容扁平化为行内内容
+                normalizedNodes.push(
+                  ...this.flattenBlockToPhrasingContent(node),
+                )
               }
 
               if (
@@ -1517,16 +1576,7 @@ export class Transformer {
               }
             }
 
-            if (normalizedNodes.every(isPhrasingContent)) {
-              return normalizedNodes
-            }
-
-            cell.data = {
-              ...cell.data,
-              invalidChildren: normalizedNodes,
-            }
-
-            return normalizedNodes.filter(isPhrasingContent)
+            return normalizedNodes
           },
         )
       }
